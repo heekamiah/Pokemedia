@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pokémon Builder FINAL PRO</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas"></script>
+
+<style>
+body{
+    font-family:Segoe UI, sans-serif;
+    background:#f6f7fb;
+    padding:20px;
+}
+
+textarea{
+    width:100%;
+    height:120px;
+    margin-bottom:10px;
+}
+
+button{
+    padding:8px;
+    margin:5px;
+    background:#4caf50;
+    color:white;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+.grid{
+    display:flex;
+    gap:20px;
+}
+
+/* CARDS */
+.card{
+    width:300px;
+    background:white;
+    border-radius:14px;
+    padding:16px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.08);
+}
+
+.title{
+    font-size:20px;
+    font-weight:bold;
+}
+
+/* TYPES */
+.type{
+    font-size:11px;
+    padding:3px 8px;
+    border-radius:6px;
+    color:white;
+    margin-right:4px;
+    display:inline-block;
+}
+
+.fire{background:#ff7043;}
+.water{background:#42a5f5;}
+.grass{background:#66bb6a;}
+.ghost{background:#7e57c2;}
+.psychic{background:#ec407a;}
+.bug{background:#9ccc65;}
+.normal{background:#9e9e9e;}
+.electric{background:#fdd835;color:#000;}
+.dark{background:#5d4037;}
+.fairy{background:#f48fb1;}
+.fighting{background:#ef5350;}
+.rock{background:#bca36b;}
+.ground{background:#8d6e63;}
+.ice{background:#4dd0e1;}
+.dragon{background:#5c6bc0;}
+
+/* MOVES */
+.move{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:9px;
+    margin-bottom:6px;
+    border-radius:8px;
+    background:#f2f4f8;
+    border:1px solid #e3e6ee;
+}
+
+.move-name{
+    font-size:14px;
+}
+
+.badge{
+    font-size:11px;
+    padding:3px 8px;
+    border-radius:6px;
+    color:white;
+}
+
+/* ABILITY */
+.ability{
+    background:#e8f5e9;
+    padding:10px;
+    border-radius:8px;
+}
+
+.ability-desc{
+    font-size:12px;
+    margin-top:8px;
+    color:#1a1a1a;
+    line-height:1.4;
+}
+
+/* STATS */
+.stat{
+    margin-bottom:12px;
+    font-size:12px;
+}
+
+.slider{
+    height:8px;
+    background:#ddd;
+    border-radius:10px;
+    position:relative;
+}
+
+.fill{
+    height:100%;
+    background:#4caf50;
+    border-radius:10px;
+}
+
+.knob{
+    position:absolute;
+    top:50%;
+    transform:translate(-50%,-50%);
+    width:12px;
+    height:12px;
+    background:white;
+    border:2px solid #4caf50;
+    border-radius:50%;
+}
+
+/* EXPORT */
+.exporting{
+    background:#1e1e2f !important;
+    color:white !important;
+}
+
+.exporting .card{
+    background:#2a2f45 !important;
+    color:white !important;
+}
+
+.exporting .title{
+    color:white !important;
+}
+
+.exporting .move{
+    background:rgba(255,255,255,0.08) !important;
+    border:none;
+}
+
+.exporting .ability{
+    background:#1f2330 !important;
+    color:white !important;
+}
+
+.exporting .ability-desc{
+    color:#f2f2f2 !important;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Pokémon Builder FINAL PRO</h2>
+
+<textarea id="input"></textarea><br>
+
+<button onclick="generar()">Generar</button>
+<button onclick="exportar('movesCard')">Moves PNG</button>
+<button onclick="exportar('abilityCard')">Ability PNG</button>
+<button onclick="exportar('statsCard')">Stats PNG</button>
+
+<div class="grid">
+
+<div class="card" id="movesCard"></div>
+<div class="card" id="abilityCard"></div>
+<div class="card" id="statsCard"></div>
+
+</div>
+
+<script>
+
+const moveCache={};
+const abilityCache={};
+
+/* MOVE TYPE */
+async function getMoveType(move){
+
+let key=move.toLowerCase().trim();
+
+if(moveCache[key]) return moveCache[key];
+
+try{
+    let clean = key.replace(/ /g,"-").replace(/'/g,"");
+
+    let res = await fetch(`https://pokeapi.co/api/v2/move/${clean}`);
+
+    if(!res.ok){
+        moveCache[key]="normal";
+        return "normal";
+    }
+
+    let data = await res.json();
+
+    let type = data?.type?.name || "normal";
+
+    moveCache[key]=type;
+    return type;
+
+}catch{
+    moveCache[key]="normal";
+    return "normal";
+}
+}
+
+/* POKEMON TYPES */
+async function getPokemonTypes(name){
+
+try{
+    let res = await fetch(`https://pokeapi.co/api/v2/pokemon/${name.toLowerCase()}`);
+    let data = await res.json();
+
+    return data.types.map(t=>t.type.name);
+
+}catch{
+    return ["normal"];
+}
+}
+
+/* ABILITY (ESPAÑOL MEJORADO) */
+async function getAbilityDesc(name){
+
+if(abilityCache[name]) return abilityCache[name];
+
+try{
+    let res = await fetch(`https://pokeapi.co/api/v2/ability/${name.toLowerCase()}`);
+    let data = await res.json();
+
+    let entry = data.effect_entries.find(e=>e.language.name==="en");
+
+    let text = entry ? entry.effect : "Sin descripción disponible.";
+
+    const dict = [
+        ["Raises the user's Attack","Aumenta el Ataque del Pokémon"],
+        ["Attack","Ataque"],
+        ["Defense","Defensa"],
+        ["Speed","Velocidad"],
+        ["prevents","evita"],
+        ["damage","daño"],
+        ["fainting","desmayo"],
+        ["opponent","oponente"],
+        ["move","movimiento"],
+        ["status","estado"]
+    ];
+
+    dict.forEach(([en,es])=>{
+        text = text.replaceAll(en,es);
+    });
+
+    abilityCache[name]=text;
+    return text;
+
+}catch{
+    return "Sin descripción disponible.";
+}
+}
+
+/* MAIN */
+async function generar(){
+
+let txt=document.getElementById("input").value.split("\n");
+
+let name=txt[0].split("@")[0].trim();
+let item=txt[0].split("@")[1];
+
+let ability="",nature="";
+let moves=[];
+let stats={HP:0,Def:0,SpD:0};
+
+txt.forEach(l=>{
+ if(l.includes("Ability")) ability=l.split(":")[1].trim();
+ if(l.includes("Nature")) nature=l.replace("Nature","").trim();
+
+ if(l.includes("EVs")){
+  l.split(":")[1].split("/").forEach(p=>{
+   let v=parseInt(p);
+   if(p.includes("HP")) stats.HP=v;
+   if(p.includes("Def")) stats.Def=v;
+   if(p.includes("SpD")) stats.SpD=v;
+  });
+ }
+
+ if(l.startsWith("-")) moves.push(l.replace("-","").trim());
+});
+
+/* TYPES */
+let types = await getPokemonTypes(name);
+
+let typesHTML = types.map(t=>`
+<span class="type ${t}">${t.toUpperCase()}</span>
+`).join("");
+
+/* MOVES */
+let movesHTML="";
+
+for(let m of moves){
+
+let type=await getMoveType(m);
+
+movesHTML+=`
+<div class="move">
+ <div class="move-name">${m}</div>
+ <div class="badge ${type}">${type.toUpperCase()}</div>
+</div>`;
+}
+
+/* ABILITY DESC */
+let desc = await getAbilityDesc(ability);
+
+/* CARDS */
+document.getElementById("movesCard").innerHTML=`
+<div class="title">${name}</div>
+<br>
+<div style="margin-bottom:10px">${typesHTML}</div>
+${movesHTML}
+`;
+
+document.getElementById("abilityCard").innerHTML=`
+<div class="title">${name}</div>
+<br>
+<div class="ability">
+<b>Ability:</b> ${ability}<br>
+<b>Item:</b> ${item}<br>
+<b>Nature:</b> ${nature}
+</div>
+
+<div class="ability-desc">${desc}</div>
+`;
+
+document.getElementById("statsCard").innerHTML=`
+<div class="title">${name}</div>
+<br>
+${stat("HP",stats.HP)}
+${stat("Def",stats.Def)}
+${stat("SpD",stats.SpD)}
+`;
+}
+
+/* STATS */
+function stat(n,v){
+let p=(v/252)*100;
+
+return `
+<div class="stat">
+ <div>${n}: ${v}</div>
+ <div class="slider">
+  <div class="fill" style="width:${p}%"></div>
+  <div class="knob" style="left:${p}%"></div>
+ </div>
+</div>`;
+}
+
+/* EXPORT */
+function exportar(id){
+
+let el=document.getElementById(id);
+el.classList.add("exporting");
+
+html2canvas(el,{scale:3}).then(c=>{
+ let a=document.createElement("a");
+ a.download=id+".png";
+ a.href=c.toDataURL();
+ a.click();
+ el.classList.remove("exporting");
+});
+}
+
+</script>
+
+</body>
+</html>
